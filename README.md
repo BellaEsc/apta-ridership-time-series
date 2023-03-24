@@ -3,5 +3,5 @@ This repository includes a time series analysis of [ridership data from the Amer
 
 The first part of the analysis involves fitting seasonal ARIMA models to two time series: the first series is the total ridership across all public transportation modes and agencies (U.S. and Canada) which I refer to in the report as APTA, and the second series is bus ridership data for the Orange County Transportation Authority (located in California) which I refer to as OCTA in the report. Both are from the same data set mentioned above. 
 
-The second part of the analysis includes fitting an ARMAX model to the OCTA series with the added variable of California GDP to see whether the multivariate model improves forecasting. 
+The second part of the analysis includes fitting an ARMAX model to the OCTA series with the added variable of California GDP to see how the multivariate model changes the forecasting.
 
