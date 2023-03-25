@@ -21,9 +21,8 @@ knitr::opts_chunk$set(
 library(tidyverse)
 library(janitor)
 library(reshape)
-library(grid)
-library(gridExtra)
 library(astsa)
+library(vars)
 ```
 
 # Introduction
@@ -70,7 +69,7 @@ octa_ts <- ts(octa_vals_num, start = c(2002, 1),
 
 Now that we have our time series object, we can begin our analysis.
 
-# Time Series Analysis
+# Time Series Analysis 1
 For the first part of our analysis, we will be fitting a **SARIMA** (Seasonal Auto-Regressive Integrated Moving Average) model to both of our time series. In order to do so, we will first make the necessary transformations to the original time series before looking at ACF and PACF plots. We will then come up with the appropriate model and make any adjustments to the parameters that will improve model performance.
 
 ## Plotting the Time Series
@@ -164,3 +163,54 @@ sarima.for(octa_l, 36, 1,1,1, 0,1,1, 12)
 ```
 
 The SARIMA forecast for the OCTA time series predicts that bus ridership for the OCTA will decrease over the next 3 years while also following monthly fluctuations.
+
+# Time Series Analysis 2
+For the second part of our analysis, we will be taking the OCTA time series and adding a second variable, California GDP. To do this, we will fit an ARIMAX model (an ARIMA model but with an X-tra variable). 
+
+## Adjusting Data
+First, I'll have to import the GDP data and make sure that the periods and time span match each other.
+
+```{r}
+# Creating California GDP time series object
+ca_gdp <- read.csv('data/SQGDP2_CA_2005_2022.csv')
+ca_gdp2 <- clean_names(ca_gdp) %>% subset(select = -c(geo_fips,geo_name,table_name,line_code,industry_classification,description,unit))
+
+ca_gdp3 <- ca_gdp2[1,] %>% melt(id = c('region'))
+
+ca_gdp_ts <- ts(ca_gdp3$value, 
+                start = c(2005, 1), 
+                end = c(2022,3), 
+                frequency = 4)
+```
+
+We will need to alter the OCTA time series to match the GDP time series. This means making it quarterly instead of monthly, beginning in 2005 Q1, and ending in 2022 Q3. 
+
+```{r}
+octa_quarterly_ts <- aggregate.ts(octa_ts, nfrequency = 4)
+octa_q_ts <- window(octa_quarterly_ts,
+                    start = c(2005, 1),
+                    end = c(2022, 3))
+```
+
+Now we need to detrend and make any transformations necessary before starting our analysis..
+
+```{r}
+plot.ts(ca_gdp_ts)
+plot.ts(octa_q_ts)
+```
+
+Looking at the plots, de-trending is definitely needed.
+
+```{r}
+ca_gdp_dl <- diff(log(ca_gdp_ts))
+octa_q_dl <- diff(log(octa_q_ts))
+plot.ts(ca_gdp_d)
+plot.ts(octa_q_d)
+```
+
+## Model Selection
+Now that we have our data matched up, we can start investigating what kind of model we should use. Using the package `vars`, I will be
+```{r}
+x <- cbind(octa_q_ts, ca_gdp_ts)
+```
+
