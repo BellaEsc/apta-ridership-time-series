@@ -22,7 +22,7 @@ library(tidyverse)
 library(janitor)
 library(reshape)
 library(astsa)
-library(vars)
+library(TSA)
 ```
 
 # Introduction
@@ -165,7 +165,7 @@ sarima.for(octa_l, 36, 1,1,1, 0,1,1, 12)
 The SARIMA forecast for the OCTA time series predicts that bus ridership for the OCTA will decrease over the next 3 years while also following monthly fluctuations.
 
 # Time Series Analysis 2
-For the second part of our analysis, we will be taking the OCTA time series and adding a second variable, California GDP. To do this, we will fit an ARIMAX model (an ARIMA model but with an X-tra variable). 
+For the second part of our analysis, we will be taking the OCTA time series and adding a second variable, California GDP. To do this, we will fit an ARIMAX model (an ARIMA model but with an e**X**ogenous variable). 
 
 ## Adjusting Data
 First, I'll have to import the GDP data and make sure that the periods and time span match each other.
@@ -192,25 +192,35 @@ octa_q_ts <- window(octa_quarterly_ts,
                     end = c(2022, 3))
 ```
 
-Now we need to detrend and make any transformations necessary before starting our analysis..
+Before beginning our model fitting, let's look at how the time series compare. 
 
 ```{r}
-plot.ts(ca_gdp_ts)
-plot.ts(octa_q_ts)
-```
+ca_gdp_l <- log(ca_gdp_ts)
+octa_q_l <- log(octa_q_ts)
 
-Looking at the plots, de-trending is definitely needed.
+ca_gdp_ld <- diff(ca_gdp_l)
+octa_q_ld <- diff(octa_q_l)
 
-```{r}
-ca_gdp_dl <- diff(log(ca_gdp_ts))
-octa_q_dl <- diff(log(octa_q_ts))
-plot.ts(ca_gdp_d)
-plot.ts(octa_q_d)
+plot(octa_q_ld, type='l', col='darkorange')
+lines(ca_gdp_ld, col='darkolivegreen4')
+legend('topright', 
+       legend=c('OCTA','CA GDP'), 
+       lty= 1,
+       col=c('darkorange', 'darkolivegreen4'))
 ```
 
 ## Model Selection
-Now that we have our data matched up, we can start investigating what kind of model we should use. Using the package `vars`, I will be
+Now that we have our data matched up, we can start investigating what kind of model we should use. Using the `TSA` package, I will try fitting an ARMAX model. Since we found a good SARIMA model for the univariate OCTA time series, we will start by using those parameters and then adding 
 ```{r}
-x <- cbind(octa_q_ts, ca_gdp_ts)
+model <- arimax(octa_q_l, 
+                order = c(1,1,1), 
+                seasonal = list(order = c(0,1,1), period=4),
+                xreg = ca_gdp_l)
+
+coef_est <- coef(model)
+se <- vcov(model) %>% diag() %>% sqrt()
+coef_df <- data.frame(estimates = coef_est, std_error = se)
+coef_df
 ```
 
+The table tells us that all of the parameters are significant. The xreg parameter in particular is quite significant which tells us that adding CA GDP as an exogenous 
