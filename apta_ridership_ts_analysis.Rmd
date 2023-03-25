@@ -23,6 +23,7 @@ library(janitor)
 library(reshape)
 library(astsa)
 library(TSA)
+library(forecast)
 ```
 
 # Introduction
@@ -69,7 +70,7 @@ octa_ts <- ts(octa_vals_num, start = c(2002, 1),
 
 Now that we have our time series object, we can begin our analysis.
 
-# Time Series Analysis 1
+# SARIMA Modeling
 For the first part of our analysis, we will be fitting a **SARIMA** (Seasonal Auto-Regressive Integrated Moving Average) model to both of our time series. In order to do so, we will first make the necessary transformations to the original time series before looking at ACF and PACF plots. We will then come up with the appropriate model and make any adjustments to the parameters that will improve model performance.
 
 ## Plotting the Time Series
@@ -164,7 +165,7 @@ sarima.for(octa_l, 36, 1,1,1, 0,1,1, 12)
 
 The SARIMA forecast for the OCTA time series predicts that bus ridership for the OCTA will decrease over the next 3 years while also following monthly fluctuations.
 
-# Time Series Analysis 2
+# ARIMAX Modeling
 For the second part of our analysis, we will be taking the OCTA time series and adding a second variable, California GDP. To do this, we will fit an ARIMAX model (an ARIMA model but with an e**X**ogenous variable). 
 
 ## Adjusting Data
@@ -209,8 +210,11 @@ legend('topright',
        col=c('darkorange', 'darkolivegreen4'))
 ```
 
-## Model Selection
-Now that we have our data matched up, we can start investigating what kind of model we should use. Using the `TSA` package, I will try fitting an ARMAX model. Since we found a good SARIMA model for the univariate OCTA time series, we will start by using those parameters and then adding 
+While OCTA ridership is generally more volatile than CA GDP, we can see that there is some relationship between the two graphs. The clearest example of this is in 2020 where both have a downward spike, but in other parts, the smaller spikes line up. 
+
+## Model Fitting
+Now that we have our data matched up, we can start investigating what kind of model we should use. Using the **TSA** package, I will try fitting an ARMAX model. Since we found a good SARIMA model for the univariate OCTA time series, we will start by using those parameters and then adding CA GDP as an exogenous variable.
+
 ```{r}
 model <- arimax(octa_q_l, 
                 order = c(1,1,1), 
@@ -223,4 +227,8 @@ coef_df <- data.frame(estimates = coef_est, std_error = se)
 coef_df
 ```
 
-The table tells us that all of the parameters are significant. The xreg parameter in particular is quite significant which tells us that adding CA GDP as an exogenous 
+The table tells us that all of the parameters are significant. The `xreg` parameter in particular is quite significant which tells us that adding CA GDP as an exogenous variable helps in explaining variation in OCTA. This is an interesting result, since it points out a clear relationship between CA GDP and bus ridership in Orange County, California.
+
+# Threshold Modeling
+
+
