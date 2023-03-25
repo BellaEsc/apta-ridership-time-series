@@ -213,21 +213,25 @@ legend('topright',
 While OCTA ridership is generally more volatile than CA GDP, we can see that there is some relationship between the two graphs. The clearest example of this is in 2020 where both have a downward spike, but in other parts, the smaller spikes line up. 
 
 ## Model Fitting
-Now that we have our data matched up, we can start investigating what kind of model we should use. Using the **TSA** package, I will try fitting an ARMAX model. Since we found a good SARIMA model for the univariate OCTA time series, we will start by using those parameters and then adding CA GDP as an exogenous variable.
+Now that we have our data matched up, we can now investigate whether CA GDP really does help explain some of the variation in OCTA. Since we found a good SARIMA model for the univariate OCTA time series, we will start by using those parameters and then adding CA GDP as an exogenous variable.
 
 ```{r}
-model <- arimax(octa_q_l, 
-                order = c(1,1,1), 
-                seasonal = list(order = c(0,1,1), period=4),
-                xreg = ca_gdp_l)
-
-coef_est <- coef(model)
-se <- vcov(model) %>% diag() %>% sqrt()
-coef_df <- data.frame(estimates = coef_est, std_error = se)
-coef_df
+model <- sarima(octa_q_l, 1,1,1, 0,1,1, 4, xreg=ca_gdp_l, details=FALSE)
+model$ttable
 ```
 
-The table tells us that all of the parameters are significant. The `xreg` parameter in particular is quite significant which tells us that adding CA GDP as an exogenous variable helps in explaining variation in OCTA. This is an interesting result, since it points out a clear relationship between CA GDP and bus ridership in Orange County, California.
+![](images/arimax_diagnostics.png)
+
+The table tells us that all of the parameters are significant. The `xreg` parameter in particular is quite significant which tells us that adding CA GDP as an exogenous variable helps in explaining variation in OCTA. This is an interesting result, since it points out a clear relationship between CA GDP and bus ridership in Orange County, California. 
+
+The diagnostic plots shed some more light on how this fit has performed. The standardized residuals have a smaller range compared to the original OCTA SARIMA model: the SARIMA residuals ranged from around -8 to 4 while the SARIMAX model ranges from around -3 to 2. This tells us that this model's predictions fit the actual values more closely than the original. However, looking at the Ljung-Box statistic, we see that there are a number of values falling below the 0.05 range, which tells us that there could be variation that can be captured by changing the seasonality or adding more terms. We will try to capture this by increasing the period.
+
+```{r}
+model <- sarima(octa_q_l, 1,1,1, 0,1,1, 8, xreg=ca_gdp_l)
+model$ttable
+```
+
+
 
 # Threshold Modeling
 
