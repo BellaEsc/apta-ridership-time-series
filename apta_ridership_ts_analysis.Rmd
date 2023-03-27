@@ -224,15 +224,64 @@ model$ttable
 
 The table tells us that all of the parameters are significant. The `xreg` parameter in particular is quite significant which tells us that adding CA GDP as an exogenous variable helps in explaining variation in OCTA. This is an interesting result, since it points out a clear relationship between CA GDP and bus ridership in Orange County, California. 
 
-The diagnostic plots shed some more light on how this fit has performed. The standardized residuals have a smaller range compared to the original OCTA SARIMA model: the SARIMA residuals ranged from around -8 to 4 while the SARIMAX model ranges from around -3 to 2. This tells us that this model's predictions fit the actual values more closely than the original. However, looking at the Ljung-Box statistic, we see that there are a number of values falling below the 0.05 range, which tells us that there could be variation that can be captured by changing the seasonality or adding more terms. We will try to capture this by increasing the period.
+The diagnostic plots shed some more light on how this fit has performed. The standardized residuals have a smaller range compared to the original OCTA SARIMA model — the SARIMA residuals ranged from around -8 to 4 while the SARIMAX model ranges from around -3 to 2. This tells us that this model's predictions fit the actual values more closely than the original. However, looking at the Ljung-Box statistic, we see that there are a number of values falling below the 0.05 range, which tells us that there could be variation that can be captured by changing the seasonality or adding more terms. We will try to capture this by increasing the period.
 
 ```{r}
-model <- sarima(octa_q_l, 1,1,1, 0,1,1, 8, xreg=ca_gdp_l)
+model <- sarima(octa_q_l, 1,1,1, 0,1,1, 7, xreg=ca_gdp_l, details=FALSE)
 model$ttable
 ```
 
+![](images/arimax_diagnostics_2.png)
 
+Setting the seasonal period at 7 has helped both the ACF and Ljung-Box plots, but now the AR1 and MA1 are not significant at significance level $\alpha = 0.05$, so we will remove them.
 
-# Threshold Modeling
+```{r}
+model <- sarima(octa_q_l, 0,1,0, 0,1,1, 7, xreg=ca_gdp_l, details=FALSE)
+model$ttable
+```
 
+![](images/arimax_diagnostics_3.png)
+
+After removing these two parameters, the Ljung-Box statistic plot looks even better with no points dipping below the p-value threshold at 0.05. Additionally, the range of the models has shrunk to around -2 to 2. 
+
+The model performing better under a periodicity of 7 instead of 4 indicates that the seasonality of the Orange County bus ridership, when taking CA GDP into account, has longer-term seasonality. The value 7 also performed better than 8, so the seasonality does not seem to extend to 2 years exactly.
+
+# Lagged Regression
+Fitting an ARIMAX model for the OCTA data with CA GDP as an exogenous variable showed that there is a strong relationship between the two. To investigate this relationship further, a lagged regression could be useful. 
+
+First, we will find what model would work with the detrended CA GDP. 
+
+```{r}
+ca_gdp.d <- resid(lm(ca_gdp_ts ~ time(ca_gdp_ts), na.action=NULL)) # Detrended OCTA
+acf2(ca_gdp.d)
+```
+
+The plots show that an MA1 model would likely work well. Now we want to make sure that both CA GDP and OCTA are prewhitened and detrended so that we can look at the cross-correlation function between them. This will tell us which variable leads the changes in the other variable or if they are symmetric. 
+
+```{r}
+fit <- arima(ca_gdp.d, order=c(0,0,1))
+ma1 <- as.numeric(coef(fit)[1]) # Grabs the coefficient value of MA1, 0.8204
+ca_gdp.pw <- resid(fit)
+octa.fil <- stats::filter(octa_q_ts, filter=c(1, -ma1), sides=1)
+ccf(ca_gdp.pw, octa.fil, ylab="CCF", lag.max = 32, na.action=na.omit, panel.first=grid())
+```
+
+The cross-correlation function between the transformed CA GDP and OCTA variables gives an interesting result. The absolute value of the peak at the negative lag is very similar to the absolute value of the peak at the positive lag, which suggests that there is a symmetric relationship between the two variables. This means that CA GDP and OCTA are consistently related to each other regardless of which variable leads the other. This is surprising to me, as I would expect CA GDP to clearly lead OCTA.
+
+The other thing that the graph tells us is the time shift between the CA GDP and OCTA. The graph peaks at around -5 and 5, so a time shift of $5*4=20$ would work best here. 
+
+Now that we have this information, we can can fit the transfer function model which allows for autocorrelated errors and do one-step-ahead predictions.
+
+```{r}
+octa_q_ts2 <- ts.intersect(octa_q_ts, RL1 = stats::lag(octa_q_ts, -1), SL5 = stats::lag(ca_gdp.d, -20))
+u <- lm(octa_q_ts2[,1]~octa_q_ts2[,2:3], na.action=NULL)
+acf2(resid(u)) # suggests a white noise model
+
+arx = sarima(octa_q_ts2[,1], 0,0,0, xreg=octa_q_ts2[,2:3], details=FALSE)
+
+pred <- octa_q_ts + resid(arx$fit) # 1-step-ahead predictions
+ts.plot(pred, octa_q_ts, col=c('gray90',1), lwd=c(7,1))
+```
+
+Here we can see the errors are not autocorrelated, so we use the white noise model. The transfer function model appears to have worked pretty well here, and we can conclude that the lagged regression with a lag of 20 between Orange County bus ridership and California GDP is a good fit. This means that there is a lag of 5 years before changes in one variable are seen in the other.
 
